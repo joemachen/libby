@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows-exe:
+    name: Build Windows EXE and publish release
+    runs-on: windows-latest
+    permissions:
+      contents: write   # required to create releases and upload assets
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: Run tests before building
+        run: python -m pytest tests/ -v
+
+      - name: Verify tag matches VERSION file
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="v$(cat VERSION | tr -d '[:space:]')"
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "::error::Tag '$TAG' does not match VERSION file (expected '$VERSION'). Update VERSION before tagging."
+            exit 1
+          fi
+          echo "Tag $TAG matches VERSION file — proceeding with build."
+
+      - name: Build EXE with PyInstaller
+        run: pyinstaller libby.spec
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/Libby.exe#Libby.exe" \
+            --title "Libby $GITHUB_REF_NAME" \
+            --generate-notes
