@@ -36,7 +36,6 @@ export function renderBookCard(book, { onDevice = false, selected = false } = {}
 <article class="book-card" data-id="${esc(book.id)}" ${selected ? 'data-selected="true"' : ""}>
   <div class="book-cover">
     ${cover}
-    ${statusDot}
     ${onDeviceBadge}
     ${checkbox}
     <div class="book-actions" aria-hidden="true">
@@ -49,7 +48,10 @@ export function renderBookCard(book, { onDevice = false, selected = false } = {}
     </div>
   </div>
   <div class="book-meta">
-    <h3 class="book-title" title="${esc(book.title)}">${esc(book.title)}</h3>
+    <div class="book-title-row">
+      <h3 class="book-title" title="${esc(book.title)}">${esc(book.title)}</h3>
+      ${statusDot}
+    </div>
     ${book.author
         ? `<p class="book-author" title="${esc(book.author)}">${esc(book.author)}</p>`
         : ""}
