@@ -23,7 +23,7 @@ export function renderBookCard(book, { onDevice = false, selected = false } = {}
         title="${esc(statusLabel[status])} — click to ${esc(nextLabel)}"></span>`;
 
     const onDeviceBadge = onDevice
-        ? `<span class="on-kobo-badge" title="Already on your Kobo">On Kobo</span>`
+        ? `<span class="on-kobo-badge" title="Already on device">On device</span>`
         : "";
 
     // Checkbox shown in selection mode (CSS hides it otherwise)
@@ -42,7 +42,7 @@ export function renderBookCard(book, { onDevice = false, selected = false } = {}
     <div class="book-actions" aria-hidden="true">
       <button class="action-btn send-btn"
               data-action="send" data-id="${esc(book.id)}"
-              title="Send to Kobo">📤 Send to Kobo</button>
+              title="Send to device">📤 Send to device</button>
       <button class="action-btn edit-btn"
               data-action="edit" data-id="${esc(book.id)}"
               title="Edit metadata">✏️ Edit</button>

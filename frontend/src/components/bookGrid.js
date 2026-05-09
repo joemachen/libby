@@ -168,7 +168,7 @@ export const BookGrid = {
         bar.innerHTML = `
 <span class="bulk-count"></span>
 <div class="bulk-actions">
-  <button class="btn-primary bulk-send-btn" disabled>📤 Send to Kobo</button>
+  <button class="btn-primary bulk-send-btn" disabled>📤 Send to device</button>
   <button class="btn-ghost bulk-cancel-btn">Cancel</button>
 </div>`;
 
@@ -203,7 +203,7 @@ export const BookGrid = {
         // the app-level kobo-connected class.
         sendBtn.classList.toggle(
             "kobo-send-inactive",
-            !document.getElementById("app")?.classList.contains("kobo-connected")
+            !document.getElementById("app")?.classList.contains("device-connected")
         );
     },
 

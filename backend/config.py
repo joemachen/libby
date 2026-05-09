@@ -35,7 +35,9 @@ DATA_PATH: Path = _resolve_path(
     PROJECT_ROOT / "data",
 )
 
-KOBO_BOOKS_FOLDER: str = os.getenv("KOBO_BOOKS_FOLDER", "")
+# DEVICE_BOOKS_FOLDER: optional subdirectory on the device to copy books into.
+# Falls back to the old KOBO_BOOKS_FOLDER env var so existing .env files keep working.
+DEVICE_BOOKS_FOLDER: str = os.getenv("DEVICE_BOOKS_FOLDER") or os.getenv("KOBO_BOOKS_FOLDER", "")
 
 PORT: int = int(os.getenv("PORT", "5000"))
 DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"

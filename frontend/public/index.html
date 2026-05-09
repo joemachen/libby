@@ -13,8 +13,8 @@
     </script>
     <link rel="stylesheet" href="/src/styles/main.css" />
     <link rel="stylesheet" href="/src/styles/grid.css" />
-    <link rel="stylesheet" href="/src/styles/kobo.css" />
-    <link rel="stylesheet" href="/src/styles/kobo-shelf.css" />
+    <link rel="stylesheet" href="/src/styles/device.css" />
+    <link rel="stylesheet" href="/src/styles/device-shelf.css" />
     <link rel="stylesheet" href="/src/styles/modal.css" />
     <link rel="stylesheet" href="/src/styles/settings.css" />
 </head>
@@ -39,7 +39,7 @@
                 <span class="brand-name">Libby</span>
             </div>
             <div class="header-right">
-                <div id="kobo-panel" class="kobo-status-bar"></div>
+                <div id="device-panel" class="kobo-status-bar"></div>
                 <button id="settings-btn" class="btn-icon" title="Settings" aria-label="Settings">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="3"/>
@@ -61,9 +61,9 @@
         </main>
     </div>
 
-    <!-- Kobo shelf drawer + backdrop -->
-    <div id="kobo-shelf-overlay" class="kobo-shelf-overlay" aria-hidden="true"></div>
-    <div id="kobo-shelf" class="kobo-shelf" role="complementary" aria-label="Kobo shelf"></div>
+    <!-- Device shelf drawer + backdrop -->
+    <div id="device-shelf-overlay" class="kobo-shelf-overlay" aria-hidden="true"></div>
+    <div id="device-shelf" class="kobo-shelf" role="complementary" aria-label="Device shelf"></div>
 
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
 

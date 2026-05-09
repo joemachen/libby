@@ -60,13 +60,13 @@ class Book:
 
 @dataclass
 class Device:
-    """Represents a detected removable storage device (e.g. Kobo e-reader)."""
+    """Represents a detected removable storage device (e-reader)."""
 
     name: str           # Volume label
     mount_point: str    # Drive letter / mount path
     free_space: int     # Bytes available
     total_space: int    # Total bytes on device
-    is_kobo: bool = False
+    device_type: str = "unknown"   # Profile key: "kobo", "pocketbook", "tolino", "boox", …
 
     def to_dict(self) -> dict:
         """Serialize to a plain dict safe for JSON responses."""
@@ -75,5 +75,5 @@ class Device:
             "mount_point": self.mount_point,
             "free_space": self.free_space,
             "total_space": self.total_space,
-            "is_kobo": self.is_kobo,
+            "device_type": self.device_type,
         }

@@ -104,20 +104,20 @@ export async function getAuthors() {
     return request("/api/authors");
 }
 
-// ── Kobo ─────────────────────────────────────────────────────────────────────
+// ── Device (e-reader) ─────────────────────────────────────────────────────────
 
 /** @returns {Promise<{connected: boolean, device?: object}>} */
-export async function getKoboStatus() {
-    return request("/api/kobo/status");
+export async function getDeviceStatus() {
+    return request("/api/device/status");
 }
 
 /**
- * Send a book to the connected Kobo.
+ * Send a book to the connected device.
  * @param {string} bookId
  * @returns {Promise<{bytes_transferred: number}>}
  */
-export async function sendToKobo(bookId) {
-    return request("/api/kobo/send", {
+export async function sendToDevice(bookId) {
+    return request("/api/device/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ book_id: bookId }),
@@ -125,27 +125,27 @@ export async function sendToKobo(bookId) {
 }
 
 /**
- * Send multiple books to the Kobo in one request.
+ * Send multiple books to the device in one request.
  * @param {string[]} bookIds
  * @returns {Promise<{results: Array<{id:string, title:string|null, ok:boolean, error?:string}>}>}
  */
-export async function bulkSendToKobo(bookIds) {
-    return request("/api/kobo/send/bulk", {
+export async function bulkSendToDevice(bookIds) {
+    return request("/api/device/send/bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ book_ids: bookIds }),
     });
 }
 
-/** Safely eject the connected Kobo from the OS. */
-export async function ejectKobo() {
-    return request("/api/kobo/eject", { method: "POST" });
+/** Safely eject the connected device from the OS. */
+export async function ejectDevice() {
+    return request("/api/device/eject", { method: "POST" });
 }
 
 /**
- * List all EPUBs on the Kobo, cross-referenced with the local library.
+ * List all EPUBs on the connected device, cross-referenced with the local library.
  * @returns {Promise<Array<{filename:string, in_library:boolean, book_id:string|null, title:string|null, author:string|null, cover_path:string|null}>>}
  */
-export async function getKoboBooks() {
-    return request("/api/kobo/books");
+export async function getDeviceBooks() {
+    return request("/api/device/books");
 }

@@ -4,12 +4,12 @@
  * Components render; app.js decides when and with what data.
  */
 
-import { getBooks, scanLibrary, updateReadStatus, getKoboBooks } from "./api.js";
-import { BookGrid   } from "./components/bookGrid.js";
-import { SearchBar  } from "./components/searchBar.js";
-import { Sidebar    } from "./components/sidebar.js";
-import { KoboPanel  } from "./components/koboPanel.js";
-import { KoboShelf  } from "./components/koboShelf.js";
+import { getBooks, scanLibrary, updateReadStatus, getDeviceBooks } from "./api.js";
+import { BookGrid    } from "./components/bookGrid.js";
+import { SearchBar   } from "./components/searchBar.js";
+import { Sidebar     } from "./components/sidebar.js";
+import { DevicePanel } from "./components/devicePanel.js";
+import { DeviceShelf } from "./components/deviceShelf.js";
 import { EditModal     } from "./components/editModal.js";
 import { SettingsModal } from "./components/settingsModal.js";
 
@@ -26,29 +26,29 @@ const state = {
     sort:          "title",
     loading:       false,
     scanning:      false,
-    koboFilenames: new Set(),   // filenames currently on the connected Kobo
+    deviceFilenames: new Set(),  // filenames currently on the connected device
     selectionMode: false,
 };
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 async function init() {
-    KoboShelf.init();
+    DeviceShelf.init();
 
-    KoboPanel.init(document.getElementById("kobo-panel"), {
+    DevicePanel.init(document.getElementById("device-panel"), {
         onConnected: async device => {
-            toast(`Kobo connected — ${_fmtBytes(device.free_space)} free.`, "success");
-            await _refreshKoboFilenames();
+            toast(`Device connected — ${_fmtBytes(device.free_space)} free.`, "success");
+            await _refreshDeviceFilenames();
         },
         onDisconnected: () => {
-            toast("Kobo disconnected.", "info");
-            state.koboFilenames = new Set();
+            toast("Device disconnected.", "info");
+            state.deviceFilenames = new Set();
             _render();
         },
-        onSent:     (title, res) => toast(`"${title}" sent to Kobo (${_fmtBytes(res.bytes_transferred)}).`, "success"),
+        onSent:     (title, res) => toast(`"${title}" sent to device (${_fmtBytes(res.bytes_transferred)}).`, "success"),
         onBulkSent: results      => _handleBulkSentResults(results),
-        onEjected:  ()           => toast("Kobo ejected safely.", "success"),
-        onShelfOpen: ()          => KoboShelf.open(),
+        onEjected:  ()           => toast("Device ejected safely.", "success"),
+        onShelfOpen: ()          => DeviceShelf.open(),
         onError: msg             => toast(msg, "error"),
     });
 
@@ -59,7 +59,7 @@ async function init() {
             EditModal.open(id, book?.title ?? title, book?.author ?? "", book?.cover_path ?? null);
         },
         onCycleStatus: handleCycleStatus,
-        onBulkSend: ids => KoboPanel.sendBooks(ids),
+        onBulkSend: ids => DevicePanel.sendBooks(ids),
         onSelectToggle: () => {
             // Called when the bulk-bar Cancel button is pressed
             state.selectionMode = false;
@@ -187,7 +187,7 @@ async function handleCycleStatus(id, currentStatus) {
 // ── Render ────────────────────────────────────────────────────────────────────
 
 function _render() {
-    BookGrid.render(state, state.koboFilenames);
+    BookGrid.render(state, state.deviceFilenames);
     SearchBar.renderMeta(state.total, state.page, state.pages);
     Sidebar.setActiveAuthor(state.author);
     Sidebar.setActiveStatus(state.statusFilter);
@@ -220,11 +220,11 @@ function toast(message, type = "info") {
 
 // ── Kobo helpers ──────────────────────────────────────────────────────────────
 
-/** Fetch the list of EPUBs on the Kobo and update state.koboFilenames. */
-async function _refreshKoboFilenames() {
+/** Fetch the list of EPUBs on the device and update state.deviceFilenames. */
+async function _refreshDeviceFilenames() {
     try {
-        const books = await getKoboBooks();
-        state.koboFilenames = new Set(books.map(b => b.filename));
+        const books = await getDeviceBooks();
+        state.deviceFilenames = new Set(books.map(b => b.filename));
         _render();
     } catch {
         // Device may have been ejected between poll and fetch — ignore
