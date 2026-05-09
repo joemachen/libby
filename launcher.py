@@ -6,6 +6,7 @@ Frozen exe:  double-click Libby.exe      (system tray icon, app-mode browser win
 """
 
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -39,6 +40,9 @@ from app import create_app  # noqa: E402  (path configured above)
 
 PORT = int(os.getenv('PORT', '5000'))
 URL  = f'http://127.0.0.1:{PORT}'
+
+# Tracks the most-recently opened app-mode browser process so Quit can close it.
+_browser_proc: subprocess.Popen | None = None
 
 
 # ── Server ────────────────────────────────────────────────────────────────────
@@ -86,12 +90,13 @@ def _open_app_window() -> None:
     """
     Open the app in a dedicated app-mode browser window (no tabs, no URL bar).
     Falls back to a regular browser tab if Chrome/Edge is not found.
+    Stores the Popen handle in _browser_proc so Quit can terminate the window.
     """
+    global _browser_proc
     time.sleep(1.5)
     browser = _find_app_browser()
     if browser:
-        import subprocess
-        subprocess.Popen([browser, f"--app={URL}"])
+        _browser_proc = subprocess.Popen([browser, f"--app={URL}"])
     else:
         webbrowser.open(URL)
 
@@ -148,7 +153,12 @@ def _run_tray() -> None:
         threading.Thread(target=_open_app_window, daemon=True).start()
 
     def _on_quit(icon, item):
-        """Stop the tray icon and terminate the process."""
+        """Close the browser window, stop the tray icon, and terminate the process."""
+        if _browser_proc is not None:
+            try:
+                _browser_proc.terminate()
+            except Exception:
+                pass
         icon.stop()
         os._exit(0)
 
