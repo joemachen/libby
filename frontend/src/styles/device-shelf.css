@@ -129,6 +129,27 @@
     background: var(--color-surface-alt);
 }
 
+.shelf-delete-btn {
+    flex-shrink: 0;
+    opacity: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.shelf-book-row:hover .shelf-delete-btn {
+    opacity: 1;
+}
+
+.shelf-delete-btn:hover {
+    color: var(--color-error, #e05a5a);
+}
+
+.shelf-row-deleting {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
 /* Cover thumbnail */
 .shelf-cover {
     width: 36px;

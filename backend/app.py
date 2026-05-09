@@ -17,6 +17,7 @@ from device import (
     send_book as device_send_book,
     eject_device as device_eject,
     list_device_books as device_list_books,
+    delete_device_book as device_delete_book,
 )
 from editor import write_metadata, replace_cover
 
@@ -185,6 +186,19 @@ def _register_api_routes(app: Flask) -> None:
                     results.append({"id": book_id, "title": book["title"], "ok": False, "error": str(exc)})
 
             return jsonify({"status": "ok", "data": {"results": results}})
+        except Exception as exc:
+            return jsonify({"status": "error", "message": str(exc), "code": 500}), 500
+
+    @app.route("/api/device/books/<path:filename>", methods=["DELETE"])
+    def device_delete_book_route(filename: str):
+        """Remove a single EPUB from the connected device by filename."""
+        try:
+            device_delete_book(filename)
+            return jsonify({"status": "ok"})
+        except FileNotFoundError as exc:
+            return jsonify({"status": "error", "message": str(exc), "code": 404}), 404
+        except RuntimeError as exc:
+            return jsonify({"status": "error", "message": str(exc), "code": 404}), 404
         except Exception as exc:
             return jsonify({"status": "error", "message": str(exc), "code": 500}), 500
 

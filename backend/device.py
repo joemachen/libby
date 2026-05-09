@@ -196,6 +196,33 @@ def list_device_books() -> list[dict]:
     return result
 
 
+def delete_device_book(filename: str) -> None:
+    """Remove a single EPUB from the connected device by bare filename.
+
+    Uses the same rglob + system_dirs filtering as list_device_books() to
+    locate the file safely without accepting arbitrary paths from the caller.
+    Raises:
+      RuntimeError      – no device connected
+      FileNotFoundError – filename not found on device
+    """
+    device = find_device()
+    if device is None:
+        raise RuntimeError("No e-reader device is currently connected")
+
+    mount = Path(device.mount_point)
+    profile = DEVICE_PROFILES.get(device.device_type, {})
+    system_dirs: set[str] = profile.get("system_dirs", set())
+
+    matches = [
+        p for p in mount.rglob(filename)
+        if not system_dirs.intersection(p.parts)
+    ]
+    if not matches:
+        raise FileNotFoundError(f"{filename!r} not found on device")
+
+    matches[0].unlink()
+
+
 def send_book(book_path: Path) -> dict:
     """
     Copy an EPUB file to the connected device.

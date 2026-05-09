@@ -149,3 +149,11 @@ export async function ejectDevice() {
 export async function getDeviceBooks() {
     return request("/api/device/books");
 }
+
+/**
+ * Delete a book from the connected device by bare filename.
+ * @param {string} filename
+ */
+export async function deleteDeviceBook(filename) {
+    return request(`/api/device/books/${encodeURIComponent(filename)}`, { method: "DELETE" });
+}

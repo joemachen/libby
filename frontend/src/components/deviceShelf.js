@@ -8,7 +8,7 @@
  *   DeviceShelf.close()         — slide the drawer out
  */
 
-import { getDeviceBooks } from "../api.js";
+import { getDeviceBooks, deleteDeviceBook } from "../api.js";
 
 export const DeviceShelf = {
     _drawer: null,
@@ -26,6 +26,17 @@ export const DeviceShelf = {
             // Close button
             if (e.target.closest(".shelf-close-btn")) {
                 this.close();
+                return;
+            }
+            // Delete book from device
+            const deleteBtn = e.target.closest("[data-action='delete-book']");
+            if (deleteBtn) {
+                const row = deleteBtn.closest(".shelf-book-row");
+                const filename = row?.dataset.filename;
+                const title = row?.querySelector(".shelf-title-text")?.textContent ?? filename;
+                if (!filename) return;
+                if (!confirm(`Remove "${title}" from device?\n\nThis cannot be undone.`)) return;
+                this._handleDelete(filename, row);
                 return;
             }
             // Tab switching
@@ -129,14 +140,29 @@ export const DeviceShelf = {
             ? `<span class="shelf-badge shelf-badge-library">In library</span>`
             : `<span class="shelf-badge shelf-badge-device">Device only</span>`;
 
-        return `<li class="shelf-book-row" ${book.book_id ? `data-book-id="${_esc(book.book_id)}"` : ""}>
+        return `<li class="shelf-book-row" data-filename="${_esc(book.filename)}"
+             ${book.book_id ? `data-book-id="${_esc(book.book_id)}"` : ""}>
   ${thumb}
   <div class="shelf-book-info">
     <span class="shelf-title-text" title="${_esc(title)}">${_esc(title)}</span>
     ${author}
   </div>
   ${badge}
+  <button class="shelf-delete-btn btn-icon" data-action="delete-book"
+          title="Remove from device" aria-label="Remove from device">✕</button>
 </li>`;
+    },
+
+    async _handleDelete(filename, rowEl) {
+        rowEl?.classList.add("shelf-row-deleting");
+        try {
+            await deleteDeviceBook(filename);
+            this._books = (this._books || []).filter(b => b.filename !== filename);
+            this._renderBooks(this._books);
+        } catch (err) {
+            rowEl?.classList.remove("shelf-row-deleting");
+            alert(`Failed to remove book: ${err.message}`);
+        }
     },
 };
 
