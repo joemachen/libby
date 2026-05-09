@@ -351,6 +351,11 @@ def _register_api_routes(app: Flask) -> None:
 def _register_static_routes(app: Flask) -> None:
     """Serve the single-page frontend and its source assets."""
 
+    @app.route("/favicon.ico")
+    def favicon():
+        """Serve the app icon as the browser favicon."""
+        return send_from_directory(str(_root / "assets"), "icon.ico")
+
     @app.route("/covers/<path:filename>")
     def serve_cover(filename: str):
         """Serve extracted cover JPEG images."""

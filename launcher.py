@@ -153,11 +153,19 @@ def _run_tray() -> None:
         threading.Thread(target=_open_app_window, daemon=True).start()
 
     def _on_quit(icon, item):
-        """Close the browser window, stop the tray icon, and terminate the process."""
-        if _browser_proc is not None:
+        """Close the browser window, stop the tray icon, and terminate the process.
+
+        Edge/Chrome hands off --app= launches to an existing browser instance and
+        exits immediately, so _browser_proc is usually already dead. Instead, scan
+        all processes for any with --app=<URL> in their command line and kill them.
+        """
+        import psutil
+        target = f"--app={URL}"
+        for proc in psutil.process_iter(['pid', 'cmdline']):
             try:
-                _browser_proc.terminate()
-            except Exception:
+                if any(target in arg for arg in (proc.info['cmdline'] or [])):
+                    proc.terminate()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
                 pass
         icon.stop()
         os._exit(0)
