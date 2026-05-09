@@ -8,6 +8,7 @@ Frozen exe:  double-click Libby.exe      (system tray icon, app-mode browser win
 import os
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import webbrowser
@@ -43,6 +44,12 @@ URL  = f'http://127.0.0.1:{PORT}'
 
 # Tracks the most-recently opened app-mode browser process so Quit can close it.
 _browser_proc: subprocess.Popen | None = None
+
+# Dedicated Chromium user-data-dir forces Edge/Chrome to spawn a separate
+# browser instance for Libby (instead of handing the URL off to the user's
+# already-running browser). Every child process inherits the flag in its
+# cmdline, which lets _on_quit reliably enumerate and terminate the whole tree.
+_USER_DATA_DIR = Path(tempfile.gettempdir()) / "libby-app-profile"
 
 
 # ── Server ────────────────────────────────────────────────────────────────────
@@ -96,7 +103,12 @@ def _open_app_window() -> None:
     time.sleep(1.5)
     browser = _find_app_browser()
     if browser:
-        _browser_proc = subprocess.Popen([browser, f"--app={URL}"])
+        _USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        _browser_proc = subprocess.Popen([
+            browser,
+            f"--app={URL}",
+            f"--user-data-dir={_USER_DATA_DIR}",
+        ])
     else:
         webbrowser.open(URL)
 
@@ -155,12 +167,13 @@ def _run_tray() -> None:
     def _on_quit(icon, item):
         """Close the browser window, stop the tray icon, and terminate the process.
 
-        Edge/Chrome hands off --app= launches to an existing browser instance and
-        exits immediately, so _browser_proc is usually already dead. Instead, scan
-        all processes for any with --app=<URL> in their command line and kill them.
+        Edge/Chrome inherit --user-data-dir to every child process (renderer,
+        GPU, utility), and our launch uses a dedicated Libby profile dir, so
+        scanning process cmdlines for that path reliably matches the entire
+        Libby browser tree without touching the user's normal browser.
         """
         import psutil
-        target = f"--app={URL}"
+        target = f"--user-data-dir={_USER_DATA_DIR}"
         for proc in psutil.process_iter(['pid', 'cmdline']):
             try:
                 if any(target in arg for arg in (proc.info['cmdline'] or [])):
