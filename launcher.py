@@ -98,28 +98,41 @@ def _open_app_window() -> None:
 
 # ── System tray ───────────────────────────────────────────────────────────────
 
+def _icon_path() -> Path:
+    """
+    Return the path to assets/icon.png.
+
+    In the frozen exe the assets folder is extracted next to the executable
+    (listed under datas in libby.spec).  In dev mode it sits at
+    <project-root>/assets/icon.png relative to this file.
+    """
+    if getattr(sys, 'frozen', False):
+        return Path(sys._MEIPASS) / 'assets' / 'icon.png'
+    return Path(__file__).parent / 'assets' / 'icon.png'
+
+
 def _make_tray_icon():
     """
-    Generate a simple book icon for the system tray using Pillow.
-    Returns a PIL Image — no external image file required.
+    Load assets/icon.png as the system-tray image.
+    Falls back to a minimal Pillow-drawn icon if the file is missing.
     """
-    from PIL import Image, ImageDraw
+    from PIL import Image
 
+    icon_file = _icon_path()
+    if icon_file.exists():
+        return Image.open(icon_file).convert("RGBA")
+
+    # ── Fallback: draw a simple purple book ───────────────────────────────
+    from PIL import ImageDraw
     size = 64
     img  = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-
-    # Book body (rounded purple rectangle)
     draw.rounded_rectangle([6, 4, 58, 60], radius=5, fill="#7c6af7")
-    # Spine (darker left strip)
     draw.rounded_rectangle([6, 4, 18, 60], radius=5, fill="#5a4fd4")
-    draw.rectangle([14, 4, 18, 60], fill="#5a4fd4")   # square off right edge of spine
-    # Pages (white area)
+    draw.rectangle([14, 4, 18, 60], fill="#5a4fd4")
     draw.rectangle([20, 10, 54, 54], fill="#f0f0f8")
-    # Page lines
     for y in (20, 28, 36, 44):
         draw.line([(25, y), (49, y)], fill="#c8c8dc", width=2)
-
     return img
 
 

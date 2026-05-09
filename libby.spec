@@ -11,6 +11,8 @@ a = Analysis(
         # Bundle the entire frontend — served at runtime via Flask routes
         ('frontend/public', 'frontend/public'),
         ('frontend/src',    'frontend/src'),
+        # App icon (tray + exe)
+        ('assets',          'assets'),
     ],
     hiddenimports=[
         # Flask stack
@@ -92,5 +94,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,
+    icon='assets/icon.ico',
 )
