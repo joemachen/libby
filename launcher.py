@@ -23,6 +23,12 @@ if getattr(sys, 'frozen', False):
     _exe_dir = Path(sys.executable).parent
     os.environ.setdefault('DATA_PATH', str(_exe_dir / 'data'))
     # Backend modules are at the top level of sys._MEIPASS — already on path.
+
+    # console=False means sys.stdout/stderr are None — redirect to a log file
+    # so errors are still capturable without a terminal window.
+    _log = open(_exe_dir / 'libby.log', 'w', buffering=1, encoding='utf-8')
+    sys.stdout = _log
+    sys.stderr = _log
 else:
     # Dev mode: add backend/ so we can `from app import create_app`.
     sys.path.insert(0, str(Path(__file__).parent / 'backend'))

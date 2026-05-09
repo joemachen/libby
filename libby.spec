@@ -81,9 +81,9 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    # console=True shows the terminal window so users can see the URL and errors.
-    # Change to False once an icon + splash screen are added.
-    console=True,
+    # console=False — no terminal window; stdout/stderr are redirected to
+    # libby.log next to the exe by launcher.py so errors are still capturable.
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
