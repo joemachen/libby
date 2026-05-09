@@ -5,12 +5,15 @@ Dev usage:   python launcher.py          (console visible, Ctrl-C to stop)
 Frozen exe:  double-click Libby.exe      (system tray icon, app-mode browser window)
 """
 
+import ctypes
+from ctypes import wintypes
 import os
 import subprocess
 import sys
 import tempfile
 import threading
 import time
+import urllib.request
 import webbrowser
 from pathlib import Path
 
@@ -93,14 +96,68 @@ def _open_browser() -> None:
     webbrowser.open(URL)
 
 
-def _open_app_window() -> None:
+def _libby_browser_pids() -> list[int]:
+    """Return PIDs of every browser process running our dedicated Libby profile."""
+    import psutil
+    target = f"--user-data-dir={_USER_DATA_DIR}"
+    pids: list[int] = []
+    for p in psutil.process_iter(['pid', 'cmdline']):
+        try:
+            if any(target in arg for arg in (p.info['cmdline'] or [])):
+                pids.append(p.info['pid'])
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+    return pids
+
+
+def _focus_libby_window() -> bool:
+    """Bring an existing Libby app-mode window to the foreground.
+
+    Enumerates top-level visible windows and matches by owning PID against the
+    set of browser processes running our dedicated --user-data-dir profile.
+    PID matching is more robust than title matching (page title can change).
+    Returns True if a window was focused.
     """
-    Open the app in a dedicated app-mode browser window (no tabs, no URL bar).
-    Falls back to a regular browser tab if Chrome/Edge is not found.
-    Stores the Popen handle in _browser_proc so Quit can terminate the window.
+    if sys.platform != 'win32':
+        return False
+
+    libby_pids = set(_libby_browser_pids())
+    if not libby_pids:
+        return False
+
+    user32 = ctypes.windll.user32
+    found: list[int] = []
+
+    @ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+    def _enum_cb(hwnd, _lparam):
+        if not user32.IsWindowVisible(hwnd):
+            return True
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if pid.value in libby_pids and user32.GetWindowTextLengthW(hwnd) > 0:
+            found.append(hwnd)
+            return False  # stop enumeration
+        return True
+
+    user32.EnumWindows(_enum_cb, 0)
+    if not found:
+        return False
+
+    hwnd = found[0]
+    user32.ShowWindow(hwnd, 9)              # SW_RESTORE — un-minimize
+    user32.SetForegroundWindow(hwnd)        # may fail silently per MSDN focus rules
+    return True
+
+
+def _ensure_app_window() -> None:
+    """Bring the Libby window to the foreground, or spawn one if none exists.
+
+    Used by both the tray "Open Libby" item and the second-instance handoff,
+    so clicking the tray icon repeatedly never spawns duplicate windows.
     """
     global _browser_proc
-    time.sleep(1.5)
+    if _focus_libby_window():
+        return
     browser = _find_app_browser()
     if browser:
         _USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -111,6 +168,21 @@ def _open_app_window() -> None:
         ])
     else:
         webbrowser.open(URL)
+
+
+def _open_app_window() -> None:
+    """Initial post-startup window open: wait for the server, then ensure window."""
+    time.sleep(1.5)
+    _ensure_app_window()
+
+
+def _check_existing_instance() -> bool:
+    """Return True if another Libby is already serving on PORT."""
+    try:
+        with urllib.request.urlopen(f"{URL}/api/health", timeout=0.5) as resp:
+            return resp.status == 200
+    except Exception:
+        return False
 
 
 # ── System tray ───────────────────────────────────────────────────────────────
@@ -161,8 +233,8 @@ def _run_tray() -> None:
     import pystray
 
     def _on_open(icon, item):
-        """Re-open the browser window."""
-        threading.Thread(target=_open_app_window, daemon=True).start()
+        """Focus the existing window, or open one if none exists."""
+        threading.Thread(target=_ensure_app_window, daemon=True).start()
 
     def _on_quit(icon, item):
         """Close the browser window, stop the tray icon, and terminate the process.
@@ -198,6 +270,13 @@ def _run_tray() -> None:
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
+    # Single-instance gate: if another Libby is already serving, hand off to it
+    # (focus its window or spawn one against its server) and exit silently.
+    # This must run before create_app() so we don't even touch the DB.
+    if getattr(sys, 'frozen', False) and _check_existing_instance():
+        _ensure_app_window()
+        sys.exit(0)
+
     flask_app = create_app()
 
     if getattr(sys, 'frozen', False):
