@@ -57,6 +57,9 @@ a = Analysis(
         'waitress.task',
         'waitress.channel',
         'waitress.buffers',
+        # System tray
+        'pystray',
+        'pystray._win32',
     ],
     hookspath=[],
     hooksconfig={},
