@@ -214,3 +214,114 @@
     border-radius: 3px;
     color: var(--color-accent-hover);
 }
+
+/* ── On-Kobo badge ───────────────────────────────────────────────────────── */
+.on-kobo-badge {
+    position: absolute;
+    top: var(--space-2);
+    left: var(--space-2);
+    padding: 2px 6px;
+    background: rgba(76, 175, 134, 0.85);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    border-radius: 4px;
+    z-index: 3;
+    pointer-events: none;
+    backdrop-filter: blur(2px);
+}
+
+/* ── Selection mode ──────────────────────────────────────────────────────── */
+
+/* Card-level checkbox label — hidden in normal mode */
+.card-select {
+    position: absolute;
+    top: var(--space-2);
+    left: var(--space-2);
+    z-index: 4;
+    display: none;
+    cursor: pointer;
+}
+
+.card-checkbox {
+    width: 17px;
+    height: 17px;
+    accent-color: var(--color-accent);
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+/* When Kobo badge is also present, nudge checkbox below it */
+.on-kobo-badge ~ .book-actions .card-select,
+.book-cover .on-kobo-badge + .card-select {
+    top: calc(var(--space-2) + 22px);
+}
+
+/* In selection mode: show checkbox, pointer cursor on card, suppress action overlay */
+.selection-mode .book-card {
+    cursor: pointer;
+}
+
+.selection-mode .card-select {
+    display: block;
+}
+
+.selection-mode .book-card:hover .book-actions {
+    opacity: 0;
+}
+
+/* Selected card: accent border + subtle highlight */
+.book-card[data-selected] {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 2px rgba(124, 106, 247, 0.35);
+}
+
+/* ── Bulk-action bar ─────────────────────────────────────────────────────── */
+.bulk-action-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-5);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.45);
+    transform: translateY(100%);
+    transition: transform 0.2s ease;
+}
+
+.bulk-action-bar.bulk-bar-visible {
+    transform: translateY(0);
+}
+
+.bulk-count {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    min-width: 120px;
+}
+
+.bulk-actions {
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+}
+
+/* Disable bulk-send when no Kobo connected */
+.bulk-send-btn.kobo-send-inactive {
+    opacity: 0.38;
+    pointer-events: none;
+    cursor: default;
+}
+
+/* Select toggle button in the search bar */
+.select-toggle-btn.active {
+    background: rgba(124, 106, 247, 0.18);
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+}

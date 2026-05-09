@@ -123,3 +123,29 @@ export async function sendToKobo(bookId) {
         body: JSON.stringify({ book_id: bookId }),
     });
 }
+
+/**
+ * Send multiple books to the Kobo in one request.
+ * @param {string[]} bookIds
+ * @returns {Promise<{results: Array<{id:string, title:string|null, ok:boolean, error?:string}>}>}
+ */
+export async function bulkSendToKobo(bookIds) {
+    return request("/api/kobo/send/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ book_ids: bookIds }),
+    });
+}
+
+/** Safely eject the connected Kobo from the OS. */
+export async function ejectKobo() {
+    return request("/api/kobo/eject", { method: "POST" });
+}
+
+/**
+ * List all EPUBs on the Kobo, cross-referenced with the local library.
+ * @returns {Promise<Array<{filename:string, in_library:boolean, book_id:string|null, title:string|null, author:string|null, cover_path:string|null}>>}
+ */
+export async function getKoboBooks() {
+    return request("/api/kobo/books");
+}

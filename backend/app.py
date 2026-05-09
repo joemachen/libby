@@ -12,7 +12,12 @@ from flask import Flask, jsonify, request, send_from_directory
 import config
 from database import init_db, get_books, get_authors, get_book_by_id, update_read_status, update_book_metadata, get_setting, set_setting
 from scanner import scan_library
-from kobo import get_status as kobo_get_status, send_book as kobo_send_book
+from kobo import (
+    get_status as kobo_get_status,
+    send_book as kobo_send_book,
+    eject_device as kobo_eject_device,
+    list_device_books as kobo_list_books,
+)
 from editor import write_metadata, replace_cover
 
 # ---------------------------------------------------------------------------
@@ -138,6 +143,59 @@ def _register_api_routes(app: Flask) -> None:
             return jsonify({"status": "error", "message": str(exc), "code": 404}), 404
         except OSError as exc:
             return jsonify({"status": "error", "message": str(exc), "code": 507}), 507
+        except Exception as exc:
+            return jsonify({"status": "error", "message": str(exc), "code": 500}), 500
+
+    @app.route("/api/kobo/eject", methods=["POST"])
+    def kobo_eject():
+        """Safely eject the connected Kobo device from the OS."""
+        try:
+            kobo_eject_device()
+            return jsonify({"status": "ok"})
+        except RuntimeError as exc:
+            return jsonify({"status": "error", "message": str(exc), "code": 404}), 404
+        except OSError as exc:
+            return jsonify({"status": "error", "message": str(exc), "code": 500}), 500
+        except Exception as exc:
+            return jsonify({"status": "error", "message": str(exc), "code": 500}), 500
+
+    @app.route("/api/kobo/send/bulk", methods=["POST"])
+    def kobo_send_bulk():
+        """Send multiple books to the Kobo in one call.
+
+        Body: { "book_ids": ["id1", "id2", ...] }
+        Returns per-book results so the UI can show partial success.
+        """
+        try:
+            body = request.get_json(force=True, silent=True) or {}
+            book_ids: list[str] = body.get("book_ids", [])
+            if not book_ids:
+                return jsonify({"status": "error", "message": "book_ids is required", "code": 400}), 400
+
+            results: list[dict] = []
+            for book_id in book_ids:
+                book = get_book_by_id(book_id)
+                if book is None:
+                    results.append({"id": book_id, "title": None, "ok": False, "error": "Book not found"})
+                    continue
+                try:
+                    kobo_send_book(Path(book["file_path"]))
+                    results.append({"id": book_id, "title": book["title"], "ok": True})
+                except Exception as exc:
+                    results.append({"id": book_id, "title": book["title"], "ok": False, "error": str(exc)})
+
+            return jsonify({"status": "ok", "data": {"results": results}})
+        except Exception as exc:
+            return jsonify({"status": "error", "message": str(exc), "code": 500}), 500
+
+    @app.route("/api/kobo/books")
+    def kobo_books():
+        """List all EPUB files on the connected Kobo, cross-referenced with the library."""
+        try:
+            books = kobo_list_books()
+            return jsonify({"status": "ok", "data": books})
+        except RuntimeError as exc:
+            return jsonify({"status": "error", "message": str(exc), "code": 404}), 404
         except Exception as exc:
             return jsonify({"status": "error", "message": str(exc), "code": 500}), 500
 

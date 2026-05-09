@@ -4,37 +4,52 @@
  * Components render; app.js decides when and with what data.
  */
 
-import { getBooks, scanLibrary, updateReadStatus } from "./api.js";
+import { getBooks, scanLibrary, updateReadStatus, getKoboBooks } from "./api.js";
 import { BookGrid   } from "./components/bookGrid.js";
 import { SearchBar  } from "./components/searchBar.js";
 import { Sidebar    } from "./components/sidebar.js";
 import { KoboPanel  } from "./components/koboPanel.js";
+import { KoboShelf  } from "./components/koboShelf.js";
 import { EditModal     } from "./components/editModal.js";
 import { SettingsModal } from "./components/settingsModal.js";
 
 // ── Application state ─────────────────────────────────────────────────────────
 
 const state = {
-    books:        [],
-    total:        0,
-    page:         1,
-    pages:        1,
-    search:       "",
-    author:       null,   // null = all authors
-    statusFilter: null,   // null = all statuses
-    sort:         "title",
-    loading:      false,
-    scanning:     false,
+    books:         [],
+    total:         0,
+    page:          1,
+    pages:         1,
+    search:        "",
+    author:        null,   // null = all authors
+    statusFilter:  null,   // null = all statuses
+    sort:          "title",
+    loading:       false,
+    scanning:      false,
+    koboFilenames: new Set(),   // filenames currently on the connected Kobo
+    selectionMode: false,
 };
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 async function init() {
+    KoboShelf.init();
+
     KoboPanel.init(document.getElementById("kobo-panel"), {
-        onConnected:    device => toast(`Kobo connected — ${_fmtBytes(device.free_space)} free.`, "success"),
-        onDisconnected: ()     => toast("Kobo disconnected.", "info"),
-        onSent:  (title, res)  => toast(`"${title}" sent to Kobo (${_fmtBytes(res.bytes_transferred)}).`, "success"),
-        onError: msg           => toast(msg, "error"),
+        onConnected: async device => {
+            toast(`Kobo connected — ${_fmtBytes(device.free_space)} free.`, "success");
+            await _refreshKoboFilenames();
+        },
+        onDisconnected: () => {
+            toast("Kobo disconnected.", "info");
+            state.koboFilenames = new Set();
+            _render();
+        },
+        onSent:     (title, res) => toast(`"${title}" sent to Kobo (${_fmtBytes(res.bytes_transferred)}).`, "success"),
+        onBulkSent: results      => _handleBulkSentResults(results),
+        onEjected:  ()           => toast("Kobo ejected safely.", "success"),
+        onShelfOpen: ()          => KoboShelf.open(),
+        onError: msg             => toast(msg, "error"),
     });
 
     BookGrid.init(document.getElementById("book-grid"), {
@@ -44,6 +59,12 @@ async function init() {
             EditModal.open(id, book?.title ?? title, book?.author ?? "", book?.cover_path ?? null);
         },
         onCycleStatus: handleCycleStatus,
+        onBulkSend: ids => KoboPanel.sendBooks(ids),
+        onSelectToggle: () => {
+            // Called when the bulk-bar Cancel button is pressed
+            state.selectionMode = false;
+            SearchBar.setSelectionMode(false);
+        },
     });
 
     SearchBar.init(document.getElementById("search-bar"), {
@@ -63,6 +84,10 @@ async function init() {
                 ? Math.max(1, state.page - 1)
                 : Math.min(state.pages, state.page + 1);
             loadBooks();
+        },
+        onSelectToggle: () => {
+            state.selectionMode = BookGrid.toggleSelectionMode();
+            // If pagination changes page, selection clears — keep button in sync
         },
     });
 
@@ -96,6 +121,10 @@ async function init() {
 // ── Data loading ──────────────────────────────────────────────────────────────
 
 async function loadBooks() {
+    // Selection is per-page only — clear when reloading
+    if (state.selectionMode) {
+        BookGrid.clearSelection();
+    }
     state.loading = true;
     _render();
 
@@ -158,7 +187,7 @@ async function handleCycleStatus(id, currentStatus) {
 // ── Render ────────────────────────────────────────────────────────────────────
 
 function _render() {
-    BookGrid.render(state);
+    BookGrid.render(state, state.koboFilenames);
     SearchBar.renderMeta(state.total, state.page, state.pages);
     Sidebar.setActiveAuthor(state.author);
     Sidebar.setActiveStatus(state.statusFilter);
@@ -187,6 +216,40 @@ function toast(message, type = "info") {
         el.classList.remove("toast-visible");
         el.addEventListener("transitionend", () => el.remove(), { once: true });
     }, 4000);
+}
+
+// ── Kobo helpers ──────────────────────────────────────────────────────────────
+
+/** Fetch the list of EPUBs on the Kobo and update state.koboFilenames. */
+async function _refreshKoboFilenames() {
+    try {
+        const books = await getKoboBooks();
+        state.koboFilenames = new Set(books.map(b => b.filename));
+        _render();
+    } catch {
+        // Device may have been ejected between poll and fetch — ignore
+    }
+}
+
+/**
+ * Show a toast summarising bulk-send results.
+ * @param {Array<{id: string, title: string, ok: boolean, error: string}>} results
+ */
+function _handleBulkSentResults(results) {
+    const sent   = results.filter(r => r.ok).length;
+    const failed = results.filter(r => !r.ok).length;
+    if (failed === 0) {
+        toast(`${sent} book${sent !== 1 ? "s" : ""} sent to Kobo.`, "success");
+    } else {
+        const failTitles = results.filter(r => !r.ok).map(r => `"${r.title}"`).join(", ");
+        toast(`${sent} sent, ${failed} failed: ${failTitles}`, "error");
+    }
+    // Exit selection mode after send
+    if (state.selectionMode) {
+        state.selectionMode = false;
+        BookGrid.toggleSelectionMode();
+        SearchBar.setSelectionMode(false);
+    }
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────

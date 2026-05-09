@@ -13,21 +13,35 @@ export const SearchBar = {
     callbacks: {},
     _searchInput: null,
     _scanBtn: null,
+    _selectBtn: null,
     _countText: null,
     _prevBtn: null,
     _nextBtn: null,
     _pageInfo: null,
+    _selectMode: false,
 
     /**
      * Mount and wire the search bar.
      * @param {HTMLElement} container
-     * @param {{ onSearch, onSort, onScan, onPage }} callbacks
+     * @param {{ onSearch, onSort, onScan, onPage, onSelectToggle }} callbacks
      */
     init(container, callbacks) {
         this.el = container;
         this.callbacks = callbacks;
         this._render();
         this._bindEvents();
+    },
+
+    /**
+     * Sync the Select button visual state — call when selection mode is
+     * cancelled externally (e.g. via the bulk-bar Cancel button).
+     * @param {boolean} active
+     */
+    setSelectionMode(active) {
+        this._selectMode = active;
+        if (!this._selectBtn) return;
+        this._selectBtn.classList.toggle("active", active);
+        this._selectBtn.textContent = active ? "Cancel Select" : "Select";
     },
 
     /** Update scan button state while a scan is in progress. */
@@ -82,6 +96,7 @@ export const SearchBar = {
         `<option value="${o.value}">${o.label}</option>`
     ).join("")}
   </select>
+  <button id="select-btn" class="btn-ghost select-toggle-btn">Select</button>
   <button id="scan-btn" class="btn-primary" style="margin-left:auto">
     Scan Library
   </button>
@@ -96,6 +111,7 @@ export const SearchBar = {
 </div>`;
 
         this._searchInput = this.el.querySelector("#search-input");
+        this._selectBtn   = this.el.querySelector("#select-btn");
         this._scanBtn     = this.el.querySelector("#scan-btn");
         this._countText   = this.el.querySelector("#book-count-text");
         this._prevBtn     = this.el.querySelector("#prev-page");
@@ -115,6 +131,13 @@ export const SearchBar = {
         this.el.querySelector("#sort-select").addEventListener("change", e =>
             this.callbacks.onSort?.(e.target.value)
         );
+
+        this._selectBtn.addEventListener("click", () => {
+            this._selectMode = !this._selectMode;
+            this._selectBtn.classList.toggle("active", this._selectMode);
+            this._selectBtn.textContent = this._selectMode ? "Cancel Select" : "Select";
+            this.callbacks.onSelectToggle?.();
+        });
 
         this._scanBtn.addEventListener("click", () =>
             this.callbacks.onScan?.()

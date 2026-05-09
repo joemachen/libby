@@ -7,9 +7,10 @@
 /**
  * Render a book as an HTML article string.
  * @param {object} book
+ * @param {{ onDevice?: boolean, selected?: boolean }} [opts]
  * @returns {string}
  */
-export function renderBookCard(book) {
+export function renderBookCard(book, { onDevice = false, selected = false } = {}) {
     const cover = book.cover_path
         ? `<img src="${esc(book.cover_path)}" alt="${esc(book.title)}" loading="lazy" />`
         : coverPlaceholder(book);
@@ -21,11 +22,23 @@ export function renderBookCard(book) {
         data-action="cycle-status" data-id="${esc(book.id)}" data-status="${esc(status)}"
         title="${esc(statusLabel[status])} — click to ${esc(nextLabel)}"></span>`;
 
+    const onDeviceBadge = onDevice
+        ? `<span class="on-kobo-badge" title="Already on your Kobo">On Kobo</span>`
+        : "";
+
+    // Checkbox shown in selection mode (CSS hides it otherwise)
+    const checkbox = `<label class="card-select" title="Select">
+      <input type="checkbox" class="card-checkbox" data-action="select"
+             data-id="${esc(book.id)}" ${selected ? "checked" : ""} />
+    </label>`;
+
     return `
-<article class="book-card" data-id="${esc(book.id)}">
+<article class="book-card" data-id="${esc(book.id)}" ${selected ? 'data-selected="true"' : ""}>
   <div class="book-cover">
     ${cover}
     ${statusDot}
+    ${onDeviceBadge}
+    ${checkbox}
     <div class="book-actions" aria-hidden="true">
       <button class="action-btn send-btn"
               data-action="send" data-id="${esc(book.id)}"

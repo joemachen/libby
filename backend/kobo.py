@@ -53,6 +53,101 @@ def get_status() -> dict:
     return {"connected": device is not None, "device": device.to_dict() if device else None}
 
 
+def eject_device() -> None:
+    """
+    Safely eject the connected Kobo from the operating system.
+
+    On Windows uses the Shell COM 'Eject' verb — equivalent to right-click →
+    Eject in File Explorer. The physical drive will unmount; the poller will
+    then detect the disconnect automatically.
+
+    Raises:
+      RuntimeError – no Kobo connected
+      OSError      – eject command failed
+    """
+    device = find_kobo()
+    if device is None:
+        raise RuntimeError("No Kobo device is currently connected")
+
+    if sys.platform != "win32":
+        raise OSError("Safe eject is only supported on Windows")
+
+    import subprocess
+
+    drive = device.mount_point.rstrip("\\/")
+    script = (
+        f"$shell = New-Object -comObject Shell.Application; "
+        f"$shell.Namespace(17).ParseName('{drive}').InvokeVerb('Eject')"
+    )
+    result = subprocess.run(
+        ["powershell", "-NoProfile", "-Command", script],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise OSError(f"Eject failed: {result.stderr.strip() or 'unknown error'}")
+
+
+def list_device_books() -> list[dict]:
+    """
+    Scan the connected Kobo for EPUB files and cross-reference with the library DB.
+
+    Returns a list of dicts with keys:
+      filename   – bare filename (e.g. "Dune.epub")
+      path       – full path on the device
+      in_library – True if the filename matches a book in the local DB
+      book_id    – local DB id, or None
+      title      – local DB title, or None
+      author     – local DB author, or None
+      cover_path – local cover URL, or None
+    """
+    device = find_kobo()
+    if device is None:
+        raise RuntimeError("No Kobo device is currently connected")
+
+    from database import get_db
+
+    mount = Path(device.mount_point)
+
+    # Collect all EPUBs, skipping the .kobo system directory
+    epub_paths = [
+        p for p in mount.rglob("*.epub")
+        if ".kobo" not in p.parts
+    ]
+
+    # Build a filename → book dict lookup from the local library
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, title, author, file_path, cover_path FROM books"
+        ).fetchall()
+
+    library_by_filename: dict[str, dict] = {}
+    for row in rows:
+        fname = Path(row["file_path"]).name
+        library_by_filename[fname] = {
+            "book_id":    row["id"],
+            "title":      row["title"],
+            "author":     row["author"],
+            "cover_path": row["cover_path"],
+        }
+
+    result: list[dict] = []
+    for ep in sorted(epub_paths, key=lambda p: p.name.lower()):
+        fname = ep.name
+        match = library_by_filename.get(fname)
+        result.append({
+            "filename":   fname,
+            "path":       str(ep),
+            "in_library": match is not None,
+            "book_id":    match["book_id"]    if match else None,
+            "title":      match["title"]      if match else None,
+            "author":     match["author"]     if match else None,
+            "cover_path": match["cover_path"] if match else None,
+        })
+
+    return result
+
+
 def send_book(book_path: Path) -> dict:
     """
     Copy an EPUB file to the connected Kobo.
