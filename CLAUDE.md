@@ -11,7 +11,7 @@ No cloud sync, no DRM handling, no format conversion.
 Delivered as a single `Libby.exe` (PyInstaller one-file, console-less).  
 In dev mode it's a plain Flask server at `http://127.0.0.1:5000`.
 
-## Current version: 0.3.10
+## Current version: 0.3.11
 
 ## Phase history
 
@@ -28,6 +28,7 @@ In dev mode it's a plain Flask server at `http://127.0.0.1:5000`.
 | 9     | App icon (PNG + ICO)            | ✅ Complete |
 | 10    | Delete books from device shelf  | ✅ Complete |
 | 11    | Strip OceanofPDF watermark      | ✅ Complete |
+| 12    | Atomic ZIP-level EPUB editing   | ✅ Complete |
 
 ## Tech stack
 
@@ -55,7 +56,7 @@ kobo-library/
 │   ├── database.py       SQLite init, migrations, get_db() context manager
 │   ├── models.py         Book and Device dataclasses
 │   ├── scanner.py        EPUB scanner
-│   ├── editor.py         Metadata writer (title, author, cover) + OceanofPDF strip
+│   ├── editor.py         ZIP-level EPUB editor (title, author, cover, OceanofPDF strip)
 │   └── device.py         Device detection + transfer (all brands)
 ├── frontend/
 │   ├── public/index.html SPA shell
@@ -184,6 +185,12 @@ git tag v0.4.0 && git push origin v0.4.0
 7. **Database access via `with get_db() as conn:` only.** Never leave connections open.
 8. **All API calls go through `api.js`.** No raw `fetch()` in component files.
 9. **VERSION file must match git tag** before pushing a release tag.
+10. **EPUB writes are ZIP-level and atomic.** `editor.py` never calls
+    ebooklib's `write_epub` (it truncates the target then can fail on
+    real-world EPUBs, destroying the file). Instead, edit entries via
+    `_rewrite_epub`: transform only the entries that change, write a sibling
+    `.tmp`, back up to `.bak`, then `os.replace`. `mimetype` stays first and
+    stored. Never reintroduce whole-book `write_epub`.
 
 ## Python conventions
 
@@ -195,6 +202,6 @@ git tag v0.4.0 && git push origin v0.4.0
 
 ```bat
 run.bat                   # Windows: set up venv, install deps, start server
-python -m pytest tests/   # Run all 66 tests
+python -m pytest tests/   # Run all 69 tests
 python launcher.py        # Dev mode (console + Ctrl-C)
 ```

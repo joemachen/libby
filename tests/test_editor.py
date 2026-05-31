@@ -116,8 +116,8 @@ class TestWriteMetadata(unittest.TestCase):
             self.assertTrue(creators, "No DC:creator found after write_metadata")
             self.assertEqual(creators[0][0], "New Author")
 
-    def test_write_metadata_creates_no_backup(self):
-        """write_metadata does NOT create a .bak file."""
+    def test_write_metadata_creates_backup(self):
+        """write_metadata creates a .bak backup before modifying (atomic-safe)."""
         from editor import write_metadata
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -125,7 +125,21 @@ class TestWriteMetadata(unittest.TestCase):
             write_metadata(epub_path, title="Changed", author=None)
 
             bak = Path(str(epub_path) + ".bak")
-            self.assertFalse(bak.exists(), "Unexpected .bak file created by write_metadata")
+            self.assertTrue(bak.exists(), "write_metadata did not create a .bak backup")
+            self.assertGreater(bak.stat().st_size, 0)
+
+    def test_write_metadata_keeps_valid_zip(self):
+        """After write_metadata the EPUB is still a valid, readable zip."""
+        import zipfile
+        from editor import write_metadata
+
+        with tempfile.TemporaryDirectory() as tmp:
+            epub_path = _make_epub(Path(tmp) / "book.epub")
+            write_metadata(epub_path, title="New", author="Auth")
+            with zipfile.ZipFile(epub_path) as z:
+                self.assertIsNone(z.testzip(), "EPUB zip is corrupt after write_metadata")
+                # mimetype must be the first entry for a valid EPUB
+                self.assertEqual(z.namelist()[0], "mimetype")
 
 
 class TestReplaceCover(unittest.TestCase):
@@ -146,8 +160,8 @@ class TestReplaceCover(unittest.TestCase):
 
     def test_replace_cover_resizes_large_image(self):
         """replace_cover resizes an oversized image to fit within 600×900."""
-        from ebooklib import epub
-        from editor import replace_cover, _find_cover_item
+        import zipfile
+        from editor import replace_cover, _opf_path, _resolve_cover_entry
         from PIL import Image
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -157,11 +171,11 @@ class TestReplaceCover(unittest.TestCase):
 
             replace_cover(epub_path, img_path)
 
-            book = epub.read_epub(str(epub_path), options={"ignore_ncx": True})
-            item = _find_cover_item(book)
-            self.assertIsNotNone(item, "No cover item found in EPUB after replace_cover")
+            cover_entry = _resolve_cover_entry(epub_path, _opf_path(epub_path))
+            self.assertIsNotNone(cover_entry, "No cover entry resolved after replace_cover")
 
-            result_img = Image.open(io.BytesIO(item.get_content()))
+            with zipfile.ZipFile(epub_path) as z:
+                result_img = Image.open(io.BytesIO(z.read(cover_entry)))
             w, h = result_img.size
             self.assertLessEqual(w, 600, f"Cover width {w} exceeds 600px")
             self.assertLessEqual(h, 900, f"Cover height {h} exceeds 900px")
@@ -269,6 +283,54 @@ class TestStripOceanofpdf(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(FileNotFoundError):
                 strip_oceanofpdf(Path(tmp) / "nope.epub")
+
+    def test_strip_preserves_non_html_entries_byte_for_byte(self):
+        """strip_oceanofpdf leaves images/CSS/OPF entries byte-identical."""
+        import zipfile
+        from editor import strip_oceanofpdf
+
+        with tempfile.TemporaryDirectory() as tmp:
+            epub_path = self._make_watermarked_epub(Path(tmp) / "book.epub")
+
+            with zipfile.ZipFile(epub_path) as z:
+                before = {n: z.read(n) for n in z.namelist()}
+
+            strip_oceanofpdf(epub_path)
+
+            with zipfile.ZipFile(epub_path) as z:
+                after = {n: z.read(n) for n in z.namelist()}
+
+            for name, data in before.items():
+                if name.lower().endswith((".xhtml", ".html", ".htm")):
+                    continue  # HTML legitimately changed
+                self.assertIn(name, after, f"entry {name} disappeared")
+                self.assertEqual(data, after[name], f"entry {name} changed unexpectedly")
+
+
+class TestAtomicSafety(unittest.TestCase):
+    """The original file must never be destroyed when a write fails."""
+
+    def test_failed_transform_leaves_original_intact(self):
+        """If the transform raises, the original is unchanged and no .tmp remains."""
+        from editor import _rewrite_epub
+
+        with tempfile.TemporaryDirectory() as tmp:
+            epub_path = _make_epub(Path(tmp) / "book.epub", title="Keep Me")
+            original = epub_path.read_bytes()
+
+            def _boom(name, data):
+                raise RuntimeError("simulated failure mid-rewrite")
+
+            with self.assertRaises(RuntimeError):
+                _rewrite_epub(epub_path, _boom)
+
+            # Original byte-for-byte intact (never truncated to 0)
+            self.assertEqual(epub_path.read_bytes(), original)
+            self.assertGreater(epub_path.stat().st_size, 0)
+            # No leftover temp file
+            self.assertFalse(epub_path.with_name(epub_path.name + ".tmp").exists())
+            # No bogus backup from the failed run
+            self.assertFalse(Path(str(epub_path) + ".bak").exists())
 
 
 if __name__ == "__main__":
