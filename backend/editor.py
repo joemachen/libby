@@ -1,8 +1,10 @@
 """
-EPUB metadata writer — edits title, author, and cover image in-place.
+EPUB metadata writer — edits title, author, cover image, and strips
+OceanofPDF watermark blocks, all in-place.
 """
 
 import io
+import re
 import shutil
 from pathlib import Path
 
@@ -14,6 +16,52 @@ _SUPPORTED_FORMATS = {"JPEG", "PNG", "WEBP"}
 
 # After epub.read_epub(), metadata is keyed by full namespace URI, not the "DC" alias.
 _DC_URI = "http://purl.org/dc/elements/1.1/"
+
+# Match a <div>/<p> block that contains an oceanofpdf.com reference WITHOUT
+# crossing into any nested block of the same type (the negative lookahead keeps
+# the match isolated to the single watermark block, so surrounding content is
+# left byte-for-byte untouched). DOTALL lets the block span multiple lines.
+_OCEAN_DIV_RE = re.compile(
+    r"<div\b(?:(?!</?div\b).)*?oceanofpdf\.com(?:(?!</?div\b).)*?</div\s*>",
+    re.IGNORECASE | re.DOTALL,
+)
+_OCEAN_P_RE = re.compile(
+    r"<p\b(?:(?!</?p\b).)*?oceanofpdf\.com(?:(?!</?p\b).)*?</p\s*>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def strip_oceanofpdf(book_path: Path) -> int:
+    """Remove OceanofPDF watermark blocks from every content document, in place.
+
+    Targets <div>/<p> blocks containing an 'oceanofpdf.com' reference (the
+    advertisement OceanofPDF injects into each chapter). Bytes outside a matched
+    block are preserved exactly via surrogateescape round-tripping.
+
+    Creates a backup at book_path + '.bak' before modifying (only when at least
+    one block is found). Returns the total number of blocks removed.
+    Raises FileNotFoundError if the EPUB does not exist.
+    """
+    if not book_path.exists():
+        raise FileNotFoundError(f"EPUB not found: {book_path}")
+
+    book = epub.read_epub(str(book_path), options={"ignore_ncx": True})
+    total = 0
+
+    for item in book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
+        text = item.get_content().decode("utf-8", errors="surrogateescape")
+        text, n_div = _OCEAN_DIV_RE.subn("", text)
+        text, n_p = _OCEAN_P_RE.subn("", text)
+        removed = n_div + n_p
+        if removed:
+            item.set_content(text.encode("utf-8", errors="surrogateescape"))
+            total += removed
+
+    if total:
+        shutil.copy2(book_path, Path(str(book_path) + ".bak"))
+        epub.write_epub(str(book_path), book)
+
+    return total
 
 
 def write_metadata(book_path: Path, title: str | None, author: str | None) -> None:

@@ -168,6 +168,7 @@ export const BookGrid = {
         bar.innerHTML = `
 <span class="bulk-count"></span>
 <div class="bulk-actions">
+  <button class="btn-ghost bulk-strip-btn" disabled>🧹 Remove OceanofPDF watermark</button>
   <button class="btn-primary bulk-send-btn" disabled>📤 Send to device</button>
   <button class="btn-ghost bulk-cancel-btn">Cancel</button>
 </div>`;
@@ -175,6 +176,11 @@ export const BookGrid = {
         bar.querySelector(".bulk-send-btn").addEventListener("click", () => {
             const ids = this.getSelectedIds();
             if (ids.length) this.callbacks.onBulkSend?.(ids);
+        });
+
+        bar.querySelector(".bulk-strip-btn").addEventListener("click", () => {
+            const ids = this.getSelectedIds();
+            if (ids.length) this.callbacks.onBulkStrip?.(ids);
         });
 
         bar.querySelector(".bulk-cancel-btn").addEventListener("click", () => {
@@ -198,6 +204,8 @@ export const BookGrid = {
             : `${count} books selected`;
         const sendBtn = this._bulkBar.querySelector(".bulk-send-btn");
         sendBtn.disabled = count === 0;
+        const stripBtn = this._bulkBar.querySelector(".bulk-strip-btn");
+        if (stripBtn) stripBtn.disabled = count === 0;
         // Send button stays disabled when no Kobo — kobo.css rule handles the
         // pointer-events; here we also disable it for non-connected state via
         // the app-level kobo-connected class.

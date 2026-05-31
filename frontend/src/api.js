@@ -73,6 +73,28 @@ export async function editBook(id, formData) {
     return request(`/api/books/${id}/edit`, { method: "POST", body: formData });
 }
 
+/**
+ * Remove OceanofPDF watermark blocks from a single book's EPUB.
+ * @param {string} id
+ * @returns {Promise<{removed: number}>} Count of blocks removed
+ */
+export async function stripWatermark(id) {
+    return request(`/api/books/${id}/strip-watermark`, { method: "POST" });
+}
+
+/**
+ * Remove OceanofPDF watermark blocks from multiple books.
+ * @param {string[]} bookIds
+ * @returns {Promise<{results: Array<{id, title, ok, removed?, error?}>}>}
+ */
+export async function bulkStripWatermark(bookIds) {
+    return request("/api/books/strip-watermark/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ book_ids: bookIds }),
+    });
+}
+
 // ── Settings ─────────────────────────────────────────────────────────────────
 
 /** @returns {Promise<{library_path: string}>} */

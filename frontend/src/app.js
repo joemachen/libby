@@ -4,7 +4,7 @@
  * Components render; app.js decides when and with what data.
  */
 
-import { getBooks, scanLibrary, updateReadStatus, getDeviceBooks } from "./api.js";
+import { getBooks, scanLibrary, updateReadStatus, getDeviceBooks, bulkStripWatermark } from "./api.js";
 import { BookGrid    } from "./components/bookGrid.js";
 import { SearchBar   } from "./components/searchBar.js";
 import { Sidebar     } from "./components/sidebar.js";
@@ -53,13 +53,14 @@ async function init() {
     });
 
     BookGrid.init(document.getElementById("book-grid"), {
-        onSend: (id, title) => KoboPanel.sendBook(id, title),
+        onSend: (id, title) => DevicePanel.sendBook(id, title),
         onEdit: (id, title) => {
             const book = state.books.find(b => b.id === id);
             EditModal.open(id, book?.title ?? title, book?.author ?? "", book?.cover_path ?? null);
         },
         onCycleStatus: handleCycleStatus,
         onBulkSend: ids => DevicePanel.sendBooks(ids),
+        onBulkStrip: ids => _handleBulkStrip(ids),
         onSelectToggle: () => {
             // Called when the bulk-bar Cancel button is pressed
             state.selectionMode = false;
@@ -245,6 +246,38 @@ function _handleBulkSentResults(results) {
         toast(`${sent} sent, ${failed} failed: ${failTitles}`, "error");
     }
     // Exit selection mode after send
+    if (state.selectionMode) {
+        state.selectionMode = false;
+        BookGrid.toggleSelectionMode();
+        SearchBar.setSelectionMode(false);
+    }
+}
+
+/**
+ * Strip OceanofPDF watermarks from the selected books and toast a summary.
+ * @param {string[]} ids
+ */
+async function _handleBulkStrip(ids) {
+    if (!ids.length) return;
+    if (!confirm(`Remove OceanofPDF watermark blocks from ${ids.length} book${ids.length !== 1 ? "s" : ""}?\n\nA .bak backup is saved next to each EPUB.`)) return;
+
+    try {
+        const { results } = await bulkStripWatermark(ids);
+        const ok      = results.filter(r => r.ok);
+        const failed  = results.filter(r => !r.ok);
+        const cleaned = ok.reduce((sum, r) => sum + (r.removed || 0), 0);
+
+        if (failed.length === 0) {
+            toast(`Cleaned ${ok.length} book${ok.length !== 1 ? "s" : ""} — ${cleaned} block${cleaned !== 1 ? "s" : ""} removed.`, "success");
+        } else {
+            const failTitles = failed.map(r => `"${r.title}"`).join(", ");
+            toast(`${ok.length} cleaned, ${failed.length} failed: ${failTitles}`, "error");
+        }
+    } catch (err) {
+        toast(err.message, "error");
+    }
+
+    // Exit selection mode after the operation
     if (state.selectionMode) {
         state.selectionMode = false;
         BookGrid.toggleSelectionMode();

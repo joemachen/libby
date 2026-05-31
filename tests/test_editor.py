@@ -192,5 +192,84 @@ class TestReplaceCover(unittest.TestCase):
                 replace_cover(missing, img_path)
 
 
+class TestStripOceanofpdf(unittest.TestCase):
+
+    _OCEAN_BLOCK = (
+        '<div style="float: none; margin: 10px 0px 10px 0px; text-align: center;">'
+        '<p><a href="https://oceanofpdf.com"><i>OceanofPDF.com</i></a></p></div>'
+    )
+
+    def _make_watermarked_epub(self, path: Path) -> Path:
+        """Create an EPUB whose chapter contains real content plus an OceanofPDF block."""
+        from ebooklib import epub
+
+        book = epub.EpubBook()
+        book.set_identifier(str(uuid.uuid4()))
+        book.set_title("Watermarked")
+        book.add_author("Author")
+        book.set_language("en")
+
+        chapter = epub.EpubHtml(title="Ch1", file_name="chap_01.xhtml", lang="en")
+        chapter.set_content(
+            "<html><body>"
+            f"{self._OCEAN_BLOCK}"
+            "<p>Real chapter content that must survive.</p>"
+            f"{self._OCEAN_BLOCK}"
+            "</body></html>"
+        )
+        book.add_item(chapter)
+        book.add_item(epub.EpubNcx())
+        book.add_item(epub.EpubNav())
+        book.spine = ["nav", chapter]
+
+        epub.write_epub(str(path), book)
+        return path
+
+    def test_strip_removes_blocks_and_keeps_content(self):
+        """strip_oceanofpdf removes every OceanofPDF block but keeps real content."""
+        from ebooklib import epub
+        from editor import strip_oceanofpdf
+        import ebooklib
+
+        with tempfile.TemporaryDirectory() as tmp:
+            epub_path = self._make_watermarked_epub(Path(tmp) / "book.epub")
+            removed = strip_oceanofpdf(epub_path)
+            self.assertEqual(removed, 2)
+
+            book = epub.read_epub(str(epub_path), options={"ignore_ncx": True})
+            for item in book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
+                body = item.get_content().decode("utf-8", errors="surrogateescape")
+                self.assertNotIn("oceanofpdf", body.lower())
+                if "chap_01" in item.get_name():
+                    self.assertIn("Real chapter content that must survive.", body)
+
+    def test_strip_creates_backup_when_blocks_found(self):
+        """strip_oceanofpdf writes a .bak file only when it removes something."""
+        from editor import strip_oceanofpdf
+
+        with tempfile.TemporaryDirectory() as tmp:
+            epub_path = self._make_watermarked_epub(Path(tmp) / "book.epub")
+            strip_oceanofpdf(epub_path)
+            self.assertTrue(Path(str(epub_path) + ".bak").exists())
+
+    def test_strip_no_blocks_returns_zero_no_backup(self):
+        """strip_oceanofpdf returns 0 and writes no backup when nothing matches."""
+        from editor import strip_oceanofpdf
+
+        with tempfile.TemporaryDirectory() as tmp:
+            epub_path = _make_epub(Path(tmp) / "clean.epub")
+            removed = strip_oceanofpdf(epub_path)
+            self.assertEqual(removed, 0)
+            self.assertFalse(Path(str(epub_path) + ".bak").exists())
+
+    def test_strip_raises_for_missing_book(self):
+        """strip_oceanofpdf raises FileNotFoundError for a missing EPUB."""
+        from editor import strip_oceanofpdf
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(FileNotFoundError):
+                strip_oceanofpdf(Path(tmp) / "nope.epub")
+
+
 if __name__ == "__main__":
     unittest.main()

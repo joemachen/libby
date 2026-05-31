@@ -19,7 +19,7 @@ from device import (
     list_device_books as device_list_books,
     delete_device_book as device_delete_book,
 )
-from editor import write_metadata, replace_cover
+from editor import write_metadata, replace_cover, strip_oceanofpdf
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -255,6 +255,50 @@ def _register_api_routes(app: Flask) -> None:
             return jsonify({"status": "error", "message": str(exc), "code": 404}), 404
         except ValueError as exc:
             return jsonify({"status": "error", "message": str(exc), "code": 400}), 400
+        except Exception as exc:
+            return jsonify({"status": "error", "message": str(exc), "code": 500}), 500
+
+    @app.route("/api/books/<book_id>/strip-watermark", methods=["POST"])
+    def strip_watermark(book_id: str):
+        """Remove OceanofPDF watermark blocks from a single book's EPUB."""
+        try:
+            book = get_book_by_id(book_id)
+            if book is None:
+                return jsonify({"status": "error", "message": "Book not found", "code": 404}), 404
+
+            removed = strip_oceanofpdf(Path(book["file_path"]))
+            return jsonify({"status": "ok", "data": {"removed": removed}})
+        except FileNotFoundError as exc:
+            return jsonify({"status": "error", "message": str(exc), "code": 404}), 404
+        except Exception as exc:
+            return jsonify({"status": "error", "message": str(exc), "code": 500}), 500
+
+    @app.route("/api/books/strip-watermark/bulk", methods=["POST"])
+    def strip_watermark_bulk():
+        """Remove OceanofPDF watermark blocks from multiple books.
+
+        Body: { "book_ids": ["id1", "id2", ...] }
+        Returns per-book results so the UI can show partial success.
+        """
+        try:
+            body = request.get_json(force=True, silent=True) or {}
+            book_ids: list[str] = body.get("book_ids", [])
+            if not book_ids:
+                return jsonify({"status": "error", "message": "book_ids is required", "code": 400}), 400
+
+            results: list[dict] = []
+            for book_id in book_ids:
+                book = get_book_by_id(book_id)
+                if book is None:
+                    results.append({"id": book_id, "title": None, "ok": False, "error": "Book not found"})
+                    continue
+                try:
+                    removed = strip_oceanofpdf(Path(book["file_path"]))
+                    results.append({"id": book_id, "title": book["title"], "ok": True, "removed": removed})
+                except Exception as exc:
+                    results.append({"id": book_id, "title": book["title"], "ok": False, "error": str(exc)})
+
+            return jsonify({"status": "ok", "data": {"results": results}})
         except Exception as exc:
             return jsonify({"status": "error", "message": str(exc), "code": 500}), 500
 

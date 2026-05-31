@@ -5,7 +5,7 @@
  * Dispatches "book-updated" on document with detail: updatedBook on save.
  */
 
-import { editBook } from "../api.js";
+import { editBook, stripWatermark } from "../api.js";
 
 let _dialog = null;
 let _currentId = null;
@@ -59,6 +59,13 @@ function _buildDialog() {
       <input type="text" id="edit-author" class="edit-text-input" />
     </label>
   </div>
+  <div class="edit-tools">
+    <button class="btn-ghost edit-strip-btn" id="edit-strip" type="button"
+            title="Remove OceanofPDF advertisement blocks injected into the book">
+      🧹 Remove OceanofPDF watermark
+    </button>
+    <span class="edit-strip-status" id="edit-strip-status" aria-live="polite"></span>
+  </div>
   <p class="edit-error" id="edit-error" hidden></p>
   <div class="edit-actions">
     <button class="btn-ghost" id="edit-cancel">Cancel</button>
@@ -81,6 +88,8 @@ function _buildDialog() {
 
     d.querySelector("#edit-save").addEventListener("click", () => _save(d));
 
+    d.querySelector("#edit-strip").addEventListener("click", () => _strip(d));
+
     return d;
 }
 
@@ -96,6 +105,32 @@ function _populate(d, title, author, coverPath) {
     const err = d.querySelector("#edit-error");
     err.hidden = true;
     err.textContent = "";
+    d.querySelector("#edit-strip-status").textContent = "";
+}
+
+async function _strip(d) {
+    const btn    = d.querySelector("#edit-strip");
+    const status = d.querySelector("#edit-strip-status");
+    const errEl  = d.querySelector("#edit-error");
+
+    if (!confirm("Remove OceanofPDF watermark blocks from this book?\n\nA .bak backup is saved next to the EPUB.")) return;
+
+    btn.disabled = true;
+    errEl.hidden = true;
+    status.textContent = "Cleaning…";
+
+    try {
+        const { removed } = await stripWatermark(_currentId);
+        status.textContent = removed > 0
+            ? `Removed ${removed} block${removed !== 1 ? "s" : ""}.`
+            : "No watermark blocks found.";
+    } catch (err) {
+        status.textContent = "";
+        errEl.textContent = err.message;
+        errEl.hidden = false;
+    } finally {
+        btn.disabled = false;
+    }
 }
 
 function _setPreview(d, src) {
