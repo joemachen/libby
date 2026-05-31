@@ -1,6 +1,6 @@
 # Libby
 
-A local EPUB library manager for Windows with Kobo device integration.
+A local EPUB library manager for Windows with e-reader device integration (Kobo, PocketBook, Tolino, ONYX Boox).
 
 **No cloud. No DRM. No format conversion. Just EPUBs.**
 
@@ -13,7 +13,9 @@ A local EPUB library manager for Windows with Kobo device integration.
 - **Browse your library** — dark/light theme, search, filter by read status and author, sort
 - **Read-status tracking** — cycle books between Unread → Reading → Read with a single click
 - **Metadata editing** — edit title, author, and cover image; changes write back to the EPUB file
-- **Kobo integration** — auto-detects a connected Kobo and copies books over with one click
+- **Clean up EPUBs** — one-click removal of OceanofPDF watermark blocks, per-book or in bulk (a `.bak` backup is kept)
+- **Device integration** — auto-detects a connected e-reader (Kobo, PocketBook, Tolino, ONYX Boox) and copies books over with one click
+- **Device shelf** — view what's on the device and delete books from it without a file manager
 - **Library sync** — rescan removes DB records for EPUBs deleted from disk
 - **Responsive UI** — works at any window width
 

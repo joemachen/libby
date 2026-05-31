@@ -206,9 +206,9 @@ export const BookGrid = {
         sendBtn.disabled = count === 0;
         const stripBtn = this._bulkBar.querySelector(".bulk-strip-btn");
         if (stripBtn) stripBtn.disabled = count === 0;
-        // Send button stays disabled when no Kobo — kobo.css rule handles the
-        // pointer-events; here we also disable it for non-connected state via
-        // the app-level kobo-connected class.
+        // Send button stays disabled when no device — device.css handles the
+        // pointer-events; here we also disable it for the non-connected state
+        // via the app-level device-connected class.
         sendBtn.classList.toggle(
             "kobo-send-inactive",
             !document.getElementById("app")?.classList.contains("device-connected")

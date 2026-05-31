@@ -11,7 +11,7 @@ No cloud sync, no DRM handling, no format conversion.
 Delivered as a single `Libby.exe` (PyInstaller one-file, console-less).  
 In dev mode it's a plain Flask server at `http://127.0.0.1:5000`.
 
-## Current version: 0.3.2
+## Current version: 0.3.10
 
 ## Phase history
 
@@ -26,6 +26,8 @@ In dev mode it's a plain Flask server at `http://127.0.0.1:5000`.
 | 7     | Device-agnostic support         | ✅ Complete |
 | 8     | System tray + app-mode window   | ✅ Complete |
 | 9     | App icon (PNG + ICO)            | ✅ Complete |
+| 10    | Delete books from device shelf  | ✅ Complete |
+| 11    | Strip OceanofPDF watermark      | ✅ Complete |
 
 ## Tech stack
 
@@ -53,7 +55,7 @@ kobo-library/
 │   ├── database.py       SQLite init, migrations, get_db() context manager
 │   ├── models.py         Book and Device dataclasses
 │   ├── scanner.py        EPUB scanner
-│   ├── editor.py         Metadata writer (title, author, cover)
+│   ├── editor.py         Metadata writer (title, author, cover) + OceanofPDF strip
 │   └── device.py         Device detection + transfer (all brands)
 ├── frontend/
 │   ├── public/index.html SPA shell
@@ -96,38 +98,6 @@ kobo-library/
 └── .env                  (copy from .env.example, never commit)
 ```
 
-## Known issues / cleanup needed
-
-These exist in the repo right now and should be fixed:
-
-### 1. Bug — `app.js` line 56: `KoboPanel` is not imported
-
-```js
-// WRONG — KoboPanel is not in scope
-onSend: (id, title) => KoboPanel.sendBook(id, title),
-
-// FIX
-onSend: (id, title) => DevicePanel.sendBook(id, title),
-```
-
-`DevicePanel` is already imported at the top of `app.js`; only the callback
-body needs updating.
-
-### 2. Orphaned files — old Kobo-specific components
-
-These files were superseded by the device-agnostic refactor but not deleted:
-
-| File | Replaced by |
-|---|---|
-| `frontend/src/components/koboPanel.js` | `devicePanel.js` |
-| `frontend/src/components/koboShelf.js` | `deviceShelf.js` |
-| `frontend/src/styles/kobo.css` | `device.css` |
-| `frontend/src/styles/kobo-shelf.css` | `device-shelf.css` |
-
-None of these are imported anywhere active — safe to `git rm` all four.
-
----
-
 ## Device support (backend/device.py)
 
 ```python
@@ -156,6 +126,9 @@ The `Device` dataclass uses `device_type: str = "unknown"` (not `is_kobo: bool`)
 | POST | `/api/device/send/bulk` | Send multiple books |
 | POST | `/api/device/eject` | Safely eject device |
 | GET | `/api/device/books` | List EPUBs on device |
+| DELETE | `/api/device/books/<filename>` | Remove one book from device |
+| POST | `/api/books/<id>/strip-watermark` | Strip OceanofPDF block from one book |
+| POST | `/api/books/strip-watermark/bulk` | Strip OceanofPDF blocks from many |
 
 ## API envelope
 
@@ -222,6 +195,6 @@ git tag v0.4.0 && git push origin v0.4.0
 
 ```bat
 run.bat                   # Windows: set up venv, install deps, start server
-python -m pytest tests/   # Run all 62 tests
+python -m pytest tests/   # Run all 66 tests
 python launcher.py        # Dev mode (console + Ctrl-C)
 ```
