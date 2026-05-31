@@ -11,7 +11,7 @@ No cloud sync, no DRM handling, no format conversion.
 Delivered as a single `Libby.exe` (PyInstaller one-file, console-less).  
 In dev mode it's a plain Flask server at `http://127.0.0.1:5000`.
 
-## Current version: 0.3.11
+## Current version: 0.3.12
 
 ## Phase history
 
@@ -29,6 +29,7 @@ In dev mode it's a plain Flask server at `http://127.0.0.1:5000`.
 | 10    | Delete books from device shelf  | ✅ Complete |
 | 11    | Strip OceanofPDF watermark      | ✅ Complete |
 | 12    | Atomic ZIP-level EPUB editing   | ✅ Complete |
+| 13    | Cache-busted cover URLs          | ✅ Complete |
 
 ## Tech stack
 

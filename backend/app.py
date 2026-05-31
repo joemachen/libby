@@ -239,12 +239,14 @@ def _register_api_routes(app: Flask) -> None:
                 try:
                     cover_file.save(str(tmp_path))
                     replace_cover(book_path, tmp_path)
-                    # Re-extract the cover from the updated EPUB to COVERS_PATH
+                    # Re-extract the cover from the updated EPUB to COVERS_PATH.
+                    # cover_url_for appends a cache-busting ?v=<mtime_ns> token so
+                    # the frontend refetches the new image instead of the cached one.
                     from ebooklib import epub as epub_lib
-                    from scanner import _extract_cover
+                    from scanner import _extract_cover, cover_url_for
                     updated_epub = epub_lib.read_epub(str(book_path), options={"ignore_ncx": True})
-                    result = _extract_cover(updated_epub, book_id)
-                    new_cover_path = f"/covers/{book_id}.jpg" if result else None
+                    extracted = _extract_cover(updated_epub, book_id)
+                    new_cover_path = cover_url_for(book_id, extracted)
                 finally:
                     tmp_path.unlink(missing_ok=True)
 

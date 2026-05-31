@@ -94,7 +94,7 @@ def _process_epub(epub_path: Path) -> Book | None:
     description = _get_dc(epub_book, "description")
 
     cover_file = _extract_cover(epub_book, book_id)
-    cover_url = f"/covers/{book_id}.jpg" if cover_file else None
+    cover_url = cover_url_for(book_id, cover_file)
 
     return Book(
         id=book_id,
@@ -139,6 +139,19 @@ def _extract_identifier(epub_book: epub.EpubBook, epub_path: Path) -> str:
 # ---------------------------------------------------------------------------
 # Cover extraction
 # ---------------------------------------------------------------------------
+
+
+def cover_url_for(book_id: str, cover_file: Path | None) -> str | None:
+    """Build the cover URL with a cache-busting version token, or None.
+
+    The token is the cover file's modification time (nanosecond resolution), so
+    the URL changes whenever the cover is re-extracted (edit or re-scan). Without
+    it the URL is stable and the browser serves a stale cached image even after
+    the underlying file is replaced.
+    """
+    if not cover_file:
+        return None
+    return f"/covers/{book_id}.jpg?v={cover_file.stat().st_mtime_ns}"
 
 
 def _extract_cover(epub_book: epub.EpubBook, book_id: str) -> Path | None:
@@ -215,7 +228,8 @@ def _delete_stale_books(scanned_paths: set[str]) -> int:
     for row in stale:
         cover_path: str | None = row["cover_path"]
         if cover_path:
-            cover_file = config.COVERS_PATH / Path(cover_path).name
+            # Strip any cache-busting ?v=<mtime> token before resolving the file
+            cover_file = config.COVERS_PATH / Path(cover_path.split("?")[0]).name
             try:
                 cover_file.unlink(missing_ok=True)
             except OSError as exc:
